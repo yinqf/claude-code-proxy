@@ -138,65 +138,6 @@ response = httpx.post(
 )
 ```
 
-### Function Calling
-
-```python
-response = httpx.post(
-    "http://localhost:8082/v1/messages",
-    json={
-        "model": "claude-3-5-haiku-20241022",  # Maps to SMALL_MODEL
-        "max_tokens": 200,
-        "messages": [
-            {"role": "user", "content": "What's the weather like?"}
-        ],
-        "tools": [
-            {
-                "name": "get_weather",
-                "description": "Get current weather",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string"}
-                    },
-                    "required": ["location"]
-                }
-            }
-        ]
-    }
-)
-```
-
-### Streaming
-
-```python
-import httpx
-
-async with httpx.AsyncClient() as client:
-    async with client.stream(
-        "POST",
-        "http://localhost:8082/v1/messages",
-        json={
-            "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 100,
-            "messages": [
-                {"role": "user", "content": "Tell me a story"}
-            ],
-            "stream": True
-        }
-    ) as response:
-        async for line in response.aiter_lines():
-            if line.strip():
-                print(line)
-```
-
-## API Endpoints
-
-- `POST /v1/messages` - Main chat completion endpoint (Claude format)
-- `POST /v1/messages/count_tokens` - Token counting
-- `GET /health` - Health check
-- `GET /test-connection` - Test provider API connectivity
-- `GET /` - Server information and configuration
-
 ## Integration with Claude Code
 
 This proxy is designed to work seamlessly with Claude Code CLI:
