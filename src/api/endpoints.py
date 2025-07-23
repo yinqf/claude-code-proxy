@@ -79,6 +79,9 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
         logger.debug(
             f"Processing Claude request: model={request.model}, stream={request.stream}"
         )
+        
+        # 添加更详细的模型名称日志
+        logger.info(f"Client requested model: '{request.model}'")
 
         # 获取适当的OpenAI客户端
         current_openai_client = get_openai_client(client_api_key)

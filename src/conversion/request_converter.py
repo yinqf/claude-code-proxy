@@ -15,7 +15,9 @@ def convert_claude_to_openai(
     """Convert Claude API request format to OpenAI format."""
 
     # Map model
+    logger.info(f"Converting model: from Claude model '{claude_request.model}' to OpenAI format")
     openai_model = model_manager.map_claude_model_to_openai(claude_request.model)
+    logger.info(f"Model mapping result: Claude '{claude_request.model}' -> OpenAI '{openai_model}'")
 
     # Convert messages
     openai_messages = []
@@ -77,13 +79,23 @@ def convert_claude_to_openai(
     openai_request = {
         "model": openai_model,
         "messages": openai_messages,
-        "max_tokens": min(
-            max(claude_request.max_tokens, config.min_tokens_limit),
-            config.max_tokens_limit,
-        ),
         "temperature": claude_request.temperature,
         "stream": claude_request.stream,
     }
+    
+    # 处理max_tokens，根据配置应用限制
+    max_tokens = claude_request.max_tokens
+    
+    # 如果配置了min_tokens_limit，则应用最小值限制
+    if config.min_tokens_limit is not None:
+        max_tokens = max(max_tokens, config.min_tokens_limit)
+        
+    # 如果配置了max_tokens_limit，则应用最大值限制
+    if config.max_tokens_limit is not None:
+        max_tokens = min(max_tokens, config.max_tokens_limit)
+        
+    openai_request["max_tokens"] = max_tokens
+    
     logger.debug(
         f"Converted Claude request to OpenAI format: {json.dumps(openai_request, indent=2, ensure_ascii=False)}"
     )

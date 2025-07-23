@@ -221,3 +221,11 @@ claude-code-proxy/
 ## License
 
 MIT License
+
+
+docker buildx build --platform linux/amd64 -t registry.cn-hongkong.aliyuncs.com/yinqf/claude-proxy:1.0.0 .  --push
+
+docker run -d --restart always -p 8082:8082 --name claude-proxy-svip -e OPENAI_BASE_URL=https://svip.xty.app/v1 -e BIG_MODEL=claude-opus-4-20250514 -e MIDDLE_MODEL=claude-sonnet-4-20250514 -e SMALL_MODEL=gpt-4.1-mini-2025-04-14 registry.cn-hongkong.aliyuncs.com/yinqf/claude-proxy:1.0.0
+
+docker run -d --restart always -p 8083:8082 --name claude-proxy-api -e OPENAI_BASE_URL=https://api.xty.app/v1 -e SMALL_MODEL=gpt-4.1-mini-2025-04-14 yinqf7437/claude-proxy:1.0.0
+

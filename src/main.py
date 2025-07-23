@@ -23,29 +23,49 @@ def main():
         print(
             f"  OPENAI_BASE_URL - OpenAI API base URL (default: https://api.openai.com/v1)"
         )
-        print(f"  BIG_MODEL - Model for opus requests (default: gpt-4o)")
-        print(f"  MIDDLE_MODEL - Model for sonnet requests (default: gpt-4o)")
-        print(f"  SMALL_MODEL - Model for haiku requests (default: gpt-4o-mini)")
+        print(f"  BIG_MODEL - Model for opus requests (default: passthrough client model if not set)")
+        print(f"  MIDDLE_MODEL - Model for sonnet requests (default: passthrough client model if not set)")
+        print(f"  SMALL_MODEL - Model for haiku requests (default: passthrough client model if not set)")
         print(f"  HOST - Server host (default: 0.0.0.0)")
         print(f"  PORT - Server port (default: 8082)")
         print(f"  LOG_LEVEL - Logging level (default: WARNING)")
-        print(f"  MAX_TOKENS_LIMIT - Token limit (default: 4096)")
-        print(f"  MIN_TOKENS_LIMIT - Minimum token limit (default: 100)")
+        print(f"  MAX_TOKENS_LIMIT - Token limit (default: None/unlimited if not set)")
+        print(f"  MIN_TOKENS_LIMIT - Minimum token limit (default: None/unlimited if not set)")
         print(f"  REQUEST_TIMEOUT - Request timeout in seconds (default: 90)")
         print("")
         print("Model mapping:")
-        print(f"  Claude haiku models -> {config.small_model}")
-        print(f"  Claude sonnet/opus models -> {config.big_model}")
+        if config.small_model:
+            print(f"  Claude haiku models -> {config.small_model}")
+        else:
+            print(f"  Claude haiku models -> passthrough (client model)")
+            
+        if config.middle_model:
+            print(f"  Claude sonnet models -> {config.middle_model}")
+        else:
+            print(f"  Claude sonnet models -> passthrough (client model)")
+            
+        if config.big_model:
+            print(f"  Claude opus models -> {config.big_model}")
+        else:
+            print(f"  Claude opus models -> passthrough (client model)")
         sys.exit(0)
 
     # Configuration summary
     print("🚀 Claude-to-OpenAI API Proxy v1.0.0")
     print(f"✅ Configuration loaded successfully")
     print(f"   OpenAI Base URL: {config.openai_base_url}")
-    print(f"   Big Model (opus): {config.big_model}")
-    print(f"   Middle Model (sonnet): {config.middle_model}")
-    print(f"   Small Model (haiku): {config.small_model}")
-    print(f"   Max Tokens Limit: {config.max_tokens_limit}")
+    
+    # 显示模型配置
+    print(f"   Big Model (opus): {config.big_model if config.big_model else 'Passthrough client model'}")
+    print(f"   Middle Model (sonnet): {config.middle_model if config.middle_model else 'Passthrough client model'}")
+    print(f"   Small Model (haiku): {config.small_model if config.small_model else 'Passthrough client model'}")
+    
+    # 显示token限制信息
+    if config.max_tokens_limit is None:
+        print(f"   Max Tokens Limit: Unlimited")
+    else:
+        print(f"   Max Tokens Limit: {config.max_tokens_limit}")
+        
     print(f"   Request Timeout: {config.request_timeout}s")
     print(f"   Server: {config.host}:{config.port}")
     print(f"   Client API Key Validation: {'Enabled' if config.anthropic_api_key else 'Disabled'}")
