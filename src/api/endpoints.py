@@ -17,6 +17,7 @@ from src.core.model_manager import model_manager
 
 router = APIRouter()
 
+# 初始化默认客户端，如果有环境变量中的API密钥则使用，否则为None
 openai_client = OpenAIClient(
     config.openai_api_key,
     config.openai_base_url,
@@ -36,22 +37,51 @@ async def validate_api_key(x_api_key: Optional[str] = Header(None), authorizatio
     
     # Skip validation if ANTHROPIC_API_KEY is not set in the environment
     if not config.anthropic_api_key:
-        return
+        return client_api_key
         
-    # Validate the client API key
+    # Validate the client API key for Anthropic validation
     if not client_api_key or not config.validate_client_api_key(client_api_key):
         logger.warning(f"Invalid API key provided by client")
         raise HTTPException(
             status_code=401,
             detail="Invalid API key. Please provide a valid Anthropic API key."
         )
+    
+    return client_api_key
+
+def get_openai_client(client_api_key: Optional[str] = None):
+    """获取OpenAI客户端，优先使用客户端提供的API密钥，其次使用环境变量中的API密钥"""
+    # 如果客户端提供了API密钥且以sk-开头（OpenAI密钥格式），则使用客户端的密钥
+    if client_api_key and client_api_key.startswith("sk-"):
+        return OpenAIClient(
+            client_api_key,
+            config.openai_base_url,
+            config.request_timeout,
+            api_version=config.azure_api_version,
+        )
+    
+    # 如果没有客户端提供的API密钥，但有环境变量中的API密钥
+    if config.openai_api_key:
+        return openai_client
+    
+    # 如果既没有客户端API密钥，也没有环境变量API密钥，则报错
+    if not config.openai_api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="No OpenAI API key provided. Please provide a valid OpenAI API key in the Authorization header."
+        )
+    
+    return openai_client
 
 @router.post("/v1/messages")
-async def create_message(request: ClaudeMessagesRequest, http_request: Request, _: None = Depends(validate_api_key)):
+async def create_message(request: ClaudeMessagesRequest, http_request: Request, client_api_key: str = Depends(validate_api_key)):
     try:
         logger.debug(
             f"Processing Claude request: model={request.model}, stream={request.stream}"
         )
+
+        # 获取适当的OpenAI客户端
+        current_openai_client = get_openai_client(client_api_key)
 
         # Generate unique request ID for cancellation tracking
         request_id = str(uuid.uuid4())
@@ -66,7 +96,7 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
         if request.stream:
             # Streaming response - wrap in error handling
             try:
-                openai_stream = openai_client.create_chat_completion_stream(
+                openai_stream = current_openai_client.create_chat_completion_stream(
                     openai_request, request_id
                 )
                 return StreamingResponse(
@@ -75,7 +105,7 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
                         request,
                         logger,
                         http_request,
-                        openai_client,
+                        current_openai_client,
                         request_id,
                     ),
                     media_type="text/event-stream",
@@ -92,7 +122,7 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
                 import traceback
 
                 logger.error(traceback.format_exc())
-                error_message = openai_client.classify_openai_error(e.detail)
+                error_message = current_openai_client.classify_openai_error(e.detail)
                 error_response = {
                     "type": "error",
                     "error": {"type": "api_error", "message": error_message},
@@ -100,7 +130,7 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
                 return JSONResponse(status_code=e.status_code, content=error_response)
         else:
             # Non-streaming response
-            openai_response = await openai_client.create_chat_completion(
+            openai_response = await current_openai_client.create_chat_completion(
                 openai_request, request_id
             )
             claude_response = convert_openai_to_claude_response(
@@ -119,7 +149,7 @@ async def create_message(request: ClaudeMessagesRequest, http_request: Request, 
 
 
 @router.post("/v1/messages/count_tokens")
-async def count_tokens(request: ClaudeTokenCountRequest, _: None = Depends(validate_api_key)):
+async def count_tokens(request: ClaudeTokenCountRequest, client_api_key: str = Depends(validate_api_key)):
     try:
         # For token counting, we'll use a simple estimation
         # In a real implementation, you might want to use tiktoken or similar
@@ -163,17 +193,20 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "openai_api_configured": bool(config.openai_api_key),
-        "api_key_valid": config.validate_api_key(),
+        "api_key_valid": config.validate_api_key() if config.openai_api_key else False,
         "client_api_key_validation": bool(config.anthropic_api_key),
     }
 
 
 @router.get("/test-connection")
-async def test_connection():
+async def test_connection(client_api_key: Optional[str] = Depends(validate_api_key)):
     """Test API connectivity to OpenAI"""
     try:
+        # 获取适当的OpenAI客户端
+        current_openai_client = get_openai_client(client_api_key)
+        
         # Simple test request to verify API connectivity
-        test_response = await openai_client.create_chat_completion(
+        test_response = await current_openai_client.create_chat_completion(
             {
                 "model": config.small_model,
                 "messages": [{"role": "user", "content": "Hello"}],
@@ -199,7 +232,7 @@ async def test_connection():
                 "message": str(e),
                 "timestamp": datetime.now().isoformat(),
                 "suggestions": [
-                    "Check your OPENAI_API_KEY is valid",
+                    "Check your OpenAI API key is valid",
                     "Verify your API key has the necessary permissions",
                     "Check if you have reached rate limits",
                 ],
